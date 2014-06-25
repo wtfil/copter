@@ -1,5 +1,6 @@
 #define CALIBRATION false
 
+
 #include <Servo.h>
 #include "I2Cdev.h"
 #include "MPU6050.h"
@@ -8,58 +9,89 @@
 // TODO move it to gyro.cpp file
 MPU6050 acce;
 
-int startTime = millis();
-float summ = 0;
-int count = 0;
-float angle = 0;
 
-float realGx (int gx, int dt) {
-  float x = gx * 0.007629627;
-  summ += x;
-  count ++;
+
+
+
+
+class Angle {
+  protected:
+    float summ;
+    int count;
+    float angle;
+  public:
   
-  if (count < 50) return angle;
+    Angle() {
+      summ = 0;
+      count = 0;
+      angle = 0;
+    }
+    
+    void update (int gx, int dt) {
+      float x = gx * 0.007629627;
+      summ += x;
+      count ++;
   
-  float realSpead = x - summ / count;
-  //Serial.print(dt); Serial.print("\t");
-  //Serial.println(realSpead);
+      if (count < 50) return;
+      
+      float realSpead = x - summ / count;
+      
+      if (abs(realSpead) <= 0.05) return;
   
-  if (realSpead >= -0.03 && realSpead <= 0.03) return angle;
+      summ -= x;
+      count --;
+      realSpead = x - summ / count;
   
-  summ -= x;
-  count --;
-  realSpead = x - summ / count;
+      angle += realSpead * dt / 1000;
   
-  angle += realSpead * dt / 1000;
+    }
   
-  return angle;
-}
+    float get () {
+      return angle;
+    }  
+};
+
 
 class Gyro {
+  
+  private:
+    int startTime;
+    int gx;
+    int gy;
+    int gz;
+    Angle x;
+    Angle y;
+    
   public: 
-    static void init() {
+    Gyro () {
+      startTime = millis();
+    }
+    void init() {
       acce.initialize();
     }
   
-    static void test() {
+    void test() {
       Serial.println(acce.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
     }
   
-    static void update() {
-      int gx; int gy; int gz;
+    void update() {
       acce.getRotation(&gx, &gy, &gz);
       int endTime = millis();
       int dt = endTime - startTime;
       startTime = endTime;
       
-      realGx(gx, dt);
+      x.update(gx, dt);
+      y.update(gy, dt);
     }
   
-    static float get() {
-      return angle;
+    void get(float& ax, float& ay) {
+      ax = x.get();
+      ay = y.get();
     }
 };
 
+
+Gyro gyro;
 
 int MIN_SPEAD = 1000;
 int MAX_SPEAD = 2000;
@@ -110,15 +142,17 @@ void setup() {
   m3.attach(M3_PIN);
   m4.attach(M4_PIN);
 
-  Gyro::init();
+  gyro.init();
 } 
  
 void loop() { 
   
-  Gyro::update();
+  gyro.update();
   
-  float x = Gyro::get();
-  Serial.println(x);
+  float x;
+  float y;
+  gyro.get(x, y);
+  Serial.print(x); Serial.print("\t"); Serial.println(y);
 
   if (Serial.available() > 0) {
     char ch = Serial.read();
@@ -137,8 +171,7 @@ void loop() {
     }
     
   }
-  delay(50);
-  //test();
+  //delay(50);
 
 }
 
