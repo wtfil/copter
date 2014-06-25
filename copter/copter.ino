@@ -1,6 +1,64 @@
 #define CALIBRATION false
 
-#include <Servo.h> 
+#include <Servo.h>
+#include "I2Cdev.h"
+#include "MPU6050.h"
+#include "Wire.h"
+
+// TODO move it to gyro.cpp file
+MPU6050 acce;
+
+int startTime = millis();
+float summ = 0;
+int count = 0;
+float angle = 0;
+
+float realGx (int gx, int dt) {
+  float x = gx * 0.007629627;
+  summ += x;
+  count ++;
+  
+  if (count < 50) return angle;
+  
+  float realSpead = x - summ / count;
+  //Serial.print(dt); Serial.print("\t");
+  //Serial.println(realSpead);
+  
+  if (realSpead >= -0.03 && realSpead <= 0.03) return angle;
+  
+  summ -= x;
+  count --;
+  realSpead = x - summ / count;
+  
+  angle += realSpead * dt / 1000;
+  
+  return angle;
+}
+
+class Gyro {
+  public: 
+    static void init() {
+      acce.initialize();
+    }
+  
+    static void test() {
+      Serial.println(acce.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+    }
+  
+    static void update() {
+      int gx; int gy; int gz;
+      acce.getRotation(&gx, &gy, &gz);
+      int endTime = millis();
+      int dt = endTime - startTime;
+      startTime = endTime;
+      
+      realGx(gx, dt);
+    }
+  
+    static float get() {
+      return angle;
+    }
+};
 
 
 int MIN_SPEAD = 1000;
@@ -52,10 +110,15 @@ void setup() {
   m3.attach(M3_PIN);
   m4.attach(M4_PIN);
 
-  //start();
+  Gyro::init();
 } 
  
 void loop() { 
+  
+  Gyro::update();
+  
+  float x = Gyro::get();
+  Serial.println(x);
 
   if (Serial.available() > 0) {
     char ch = Serial.read();
