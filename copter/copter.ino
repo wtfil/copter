@@ -1,24 +1,26 @@
 #define CALIBRATION false
 
-
 #include <Servo.h>
 #include "I2Cdev.h"
 #include "MPU6050.h"
 #include "Wire.h"
 
+int MIN_SPEAD = 1000;
+int MAX_SPEAD = 2000;
+int M1_PIN = 6;
+int M2_PIN = 7;
+int M3_PIN = 8;
+int M4_PIN = 9;
+
 // TODO move it to gyro.cpp file
-MPU6050 acce;
-
-
-
-
-
 
 class Angle {
+  
   protected:
     float summ;
     int count;
     float angle;
+    
   public:
   
     Angle() {
@@ -61,6 +63,7 @@ class Gyro {
     int gz;
     Angle x;
     Angle y;
+    MPU6050 acce;
     
   public: 
     Gyro () {
@@ -90,20 +93,32 @@ class Gyro {
     }
 };
 
+class Motor {
+  
+  private:
+    Servo m;
+    int balanceSpead;
+    
+  public:
+    Motor (int pin) {
+      m.attach(pin);
+      balanceSpead = 0;
+    }
+    
+    void balance(int spead) {
+      balanceSpead = spead;
+    }
+    
+    void set(int spead) {
+      m.writeMicroseconds(spead + balanceSpead);
+    } 
+};
 
 Gyro gyro;
-
-int MIN_SPEAD = 1000;
-int MAX_SPEAD = 2000;
-int M1_PIN = 6;
-int M2_PIN = 7;
-int M3_PIN = 8;
-int M4_PIN = 9;
- 
-Servo m1; 
-Servo m2; 
-Servo m3;
-Servo m4; 
+Motor m1(M1_PIN);
+Motor m2(M2_PIN); 
+Motor m3(M3_PIN);
+Motor m4(M4_PIN);
 
 String input;
 
@@ -111,25 +126,23 @@ String input;
 void setup() {
   Serial.begin(9600);
   
-  m1.attach(M1_PIN);
-  m2.attach(M2_PIN);
-  m3.attach(M3_PIN);
-  m4.attach(M4_PIN);
-  m1.writeMicroseconds(MAX_SPEAD);
-  m2.writeMicroseconds(MAX_SPEAD);
-  m3.writeMicroseconds(MAX_SPEAD);
-  m4.writeMicroseconds(MAX_SPEAD);
+  m1.set(MAX_SPEAD);
+  m2.set(MAX_SPEAD);
+  m3.set(MAX_SPEAD);
+  m4.set(MAX_SPEAD);
   
   // Wait for input
   while (!Serial.available());
   Serial.read();
   Serial.println("Minimum 1");
   
-  m1.writeMicroseconds(MIN_SPEAD);
-  m2.writeMicroseconds(MIN_SPEAD);
-  m3.writeMicroseconds(MIN_SPEAD);
-  m4.writeMicroseconds(MIN_SPEAD);
+  m1.set(MIN_SPEAD);
+  m2.set(MIN_SPEAD);
+  m3.set(MIN_SPEAD);
+  m4.set(MIN_SPEAD);
   Serial.println("Minimum 2");
+  
+  */
 }
 void loop() {}
 
@@ -137,14 +150,19 @@ void loop() {}
 
 void setup() { 
   Serial.begin(9600);
+  while (!Serial.available());
+  /*
   m1.attach(M1_PIN);
   m2.attach(M2_PIN);
   m3.attach(M3_PIN);
   m4.attach(M4_PIN);
-
+  */
   gyro.init();
 } 
  
+int offsetX = 0; // m1 +, m3 -
+int offsetY = 0; // m2 +, m4 -
+
 void loop() { 
   
   gyro.update();
@@ -152,26 +170,58 @@ void loop() {
   float x;
   float y;
   gyro.get(x, y);
-  Serial.print(x); Serial.print("\t"); Serial.println(y);
+  
+  if (x > 0) {
+    offsetX -= 1;
+  } else {
+    offsetX += 1;
+  }
+  
+  if (y > 0) {
+    offsetY += 1;
+  } else {
+    offsetY -= 1;
+  }
+  
+  if (offsetX > 0) {
+    m1.balance(-offsetX);
+    m3.balance(0);
+  } else {
+    m3.balance(offsetX);
+    m1.balance(0);
+  }
+  
+  if (offsetY > 0) {
+    m2.balance(-offsetY);
+    m4.balance(0);
+  } else {
+    m4.balance(offsetY);
+    m2.balance(0);
+  }
+  
+  //Serial.print(x); Serial.print("\t"); Serial.println(y);
 
   if (Serial.available() > 0) {
+    Serial.println("available");
     char ch = Serial.read();
-
-    if (ch != 10) {
+    
+    if (ch != 13) {     
       input += ch;
     }  else {
+      
       int val = input.toInt();
       Serial.println(val);
       input = "";
       
-      m1.writeMicroseconds(val);
-      m2.writeMicroseconds(val);
-      m3.writeMicroseconds(val);
-      m4.writeMicroseconds(val);
+      m1.set(val);
+      m2.set(val);
+      m3.set(val);
+      m4.set(val);
+      
     }
     
   }
-  //delay(50);
+
 
 }
 
