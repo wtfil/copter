@@ -13,47 +13,49 @@ int M3_PIN = 8;
 int M4_PIN = 9;
 
 // TODO move it to gyro.cpp file
-
 class Angle {
-  
+
   protected:
     float summ;
     int count;
     float angle;
-    
+    float error;
+
   public:
-  
+
     Angle() {
       summ = 0;
       count = 0;
       angle = 0;
     }
-    
+
     void update (int gx, int dt) {
       float x = gx * 0.007629627;
       summ += x;
       count ++;
-  
-      if (count < 50) return;
-      
       float realSpead = x - summ / count;
-      
-      if (abs(realSpead) <= 0.05) return;
-  
+
+      if (count < 100) {
+        error += abs(realSpead); 
+        return;
+      }
+
+      if (abs(realSpead) <= error / count) return;
+
       summ -= x;
       count --;
       realSpead = x - summ / count;
-  
+
       angle += realSpead * dt / 1000;
-  
+
     }
-  
-    float get () {
+
+    int get () {
       return angle;
-    }  
+    }
 };
 
-
+// TODO move it to gyro.cpp file
 class Gyro {
   
   private:
@@ -71,10 +73,6 @@ class Gyro {
     }
     void init() {
       acce.initialize();
-    }
-  
-    void test() {
-      Serial.println(acce.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
     }
   
     void update() {
@@ -97,28 +95,44 @@ class Motor {
   
   private:
     Servo m;
-    int balanceSpead;
+    String name;
+    int spead;
+    int pin;
+    float balanceSpead;
     
   public:
-    Motor (int pin) {
-      m.attach(pin);
+    Motor (int p, String n) {
       balanceSpead = 0;
+      spead = 0;
+      pin = p;
+      name = n;
     }
     
-    void balance(int spead) {
-      balanceSpead = spead;
+    void init() {
+      m.attach(pin);
     }
     
-    void set(int spead) {
-      m.writeMicroseconds(spead + balanceSpead);
-    } 
+    void balance(float angle) {
+      balanceSpead = (1 - sin(angle * PI / 180) / 2);
+      m.writeMicroseconds(get()); 
+    }
+    
+    int get () {
+      //return max(spead + balanceSpead, 0);
+      return max(spead * balanceSpead, 0);
+    }
+    
+    void set(int s) {
+      spead = s;
+      m.writeMicroseconds(get());
+    }
 };
 
 Gyro gyro;
-Motor m1(M1_PIN);
-Motor m2(M2_PIN); 
-Motor m3(M3_PIN);
-Motor m4(M4_PIN);
+Motor m1(M1_PIN, "M1");
+Motor m2(M2_PIN, "M2"); 
+Motor m3(M3_PIN, "M3");
+Motor m4(M4_PIN, "M4");
 
 String input;
 
@@ -142,7 +156,6 @@ void setup() {
   m4.set(MIN_SPEAD);
   Serial.println("Minimum 2");
   
-  */
 }
 void loop() {}
 
@@ -151,18 +164,14 @@ void loop() {}
 void setup() { 
   Serial.begin(9600);
   while (!Serial.available());
-  /*
-  m1.attach(M1_PIN);
-  m2.attach(M2_PIN);
-  m3.attach(M3_PIN);
-  m4.attach(M4_PIN);
-  */
+
+  m1.init();
+  m2.init();
+  m3.init();
+  m4.init();
   gyro.init();
 } 
  
-int offsetX = 0; // m1 +, m3 -
-int offsetY = 0; // m2 +, m4 -
-
 void loop() { 
   
   gyro.update();
@@ -172,37 +181,31 @@ void loop() {
   gyro.get(x, y);
   
   if (x > 0) {
-    offsetX -= 1;
-  } else {
-    offsetX += 1;
-  }
-  
-  if (y > 0) {
-    offsetY += 1;
-  } else {
-    offsetY -= 1;
-  }
-  
-  if (offsetX > 0) {
-    m1.balance(-offsetX);
+    m1.balance(x);
     m3.balance(0);
   } else {
-    m3.balance(offsetX);
+    m3.balance(-x);
     m1.balance(0);
   }
   
-  if (offsetY > 0) {
-    m2.balance(-offsetY);
+  if (y > 0) {
+    m2.balance(y);
     m4.balance(0);
   } else {
-    m4.balance(offsetY);
+    m4.balance(-y);
     m2.balance(0);
   }
   
-  //Serial.print(x); Serial.print("\t"); Serial.println(y);
-
-  if (Serial.available() > 0) {
-    Serial.println("available");
+  /*
+  Serial.print(x);Serial.print("\t");
+  Serial.print(y);Serial.print("\t");
+  Serial.print(m1.get());Serial.print("\t"); 
+  Serial.print(m2.get());Serial.print("\t");
+  Serial.print(m3.get());Serial.print("\t");
+  Serial.print(m4.get());Serial.print("\t");
+  Serial.println();
+  */
+  if (Serial.available() > 0) {    
     char ch = Serial.read();
     
     if (ch != 13) {     
@@ -221,7 +224,7 @@ void loop() {
     }
     
   }
-
+  //delay(50);
 
 }
 
