@@ -39,7 +39,7 @@ class Angle {
         error += abs(realSpead); 
         return;
       }
-
+      //Serial.print(gx); Serial.print("\t");
       if (abs(realSpead) <= error / count) return;
 
       summ -= x;
@@ -53,6 +53,10 @@ class Angle {
     int get () {
       return angle;
     }
+    
+    void reset() {
+      summ = error = count = angle = 0;
+    }
 };
 
 // TODO move it to gyro.cpp file
@@ -60,6 +64,7 @@ class Gyro {
   
   private:
     int startTime;
+    boolean enabled;
     int gx;
     int gy;
     int gz;
@@ -70,6 +75,7 @@ class Gyro {
   public: 
     Gyro () {
       startTime = millis();
+      enabled = true;
     }
     void init() {
       acce.initialize();
@@ -77,6 +83,7 @@ class Gyro {
   
     void update() {
       acce.getRotation(&gx, &gy, &gz);
+      //Serial.print("gx, gy:\t"); Serial.print(gx); Serial.println(gy);
       int endTime = millis();
       int dt = endTime - startTime;
       startTime = endTime;
@@ -86,8 +93,25 @@ class Gyro {
     }
   
     void get(float& ax, float& ay) {
+      if (!enabled) {
+        ax = ay = 0;
+        return;
+      }
       ax = x.get();
       ay = y.get();
+    }
+    
+    void reset() {
+      x.reset();
+      y.reset();
+    }
+    
+    void off () {
+      enabled = false;
+    }
+    
+    void on () {
+      enabled = true;
     }
 };
 
@@ -118,8 +142,8 @@ class Motor {
     }
     
     int get () {
-      //return max(spead + balanceSpead, 0);
-      return max(spead * balanceSpead, 0);
+      int diff = spead - MIN_SPEAD;
+      return diff <= 0 ? spead : (MIN_SPEAD + diff * balanceSpead);
     }
     
     void set(int s) {
@@ -139,6 +163,11 @@ String input;
 #if CALIBRATION
 void setup() {
   Serial.begin(9600);
+  
+  m1.init();
+  m2.init();
+  m3.init();
+  m4.init();
   
   m1.set(MAX_SPEAD);
   m2.set(MAX_SPEAD);
@@ -196,7 +225,6 @@ void loop() {
     m2.balance(0);
   }
   
-  /*
   Serial.print(x);Serial.print("\t");
   Serial.print(y);Serial.print("\t");
   Serial.print(m1.get());Serial.print("\t"); 
@@ -204,23 +232,33 @@ void loop() {
   Serial.print(m3.get());Serial.print("\t");
   Serial.print(m4.get());Serial.print("\t");
   Serial.println();
-  */
+
   if (Serial.available() > 0) {    
     char ch = Serial.read();
     
     if (ch != 13) {     
       input += ch;
     }  else {
-      
       int val = input.toInt();
-      Serial.println(val);
+      if (String("reset") == input) {
+        Serial.println("reseting..");
+        gyro.reset();
+      } else if (String("off") == input) {
+        Serial.println("disable..");
+        gyro.off();
+      } else if (String("on") == input) {
+        Serial.println("enable..");
+        gyro.on();
+      } else if (val >= MIN_SPEAD && val <= MAX_SPEAD) {
+        Serial.print("writing:\t"); Serial.println(val);
+        m1.set(val);
+        m2.set(val);
+        m3.set(val);
+        m4.set(val);
+      } else {
+        Serial.println("Wrong command");
+      }
       input = "";
-      
-      m1.set(val);
-      m2.set(val);
-      m3.set(val);
-      m4.set(val);
-      
     }
     
   }
