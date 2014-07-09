@@ -1,5 +1,3 @@
-#define CALIBRATION true
-
 #include <Servo.h>
 #include "I2Cdev.h"
 #include "MPU6050.h"
@@ -171,50 +169,67 @@ Motor m3(M3_PIN, "M3");
 Motor m4(M4_PIN, "M4");
 
 String input;
+boolean isCalibrate = false;
 
-#if CALIBRATION
-void setup() {
-  Serial.begin(9600);
+String dialog(const char* message) {
+  String input;
   
+  Serial.print("Arduino: ");
+  Serial.println(message);
+  Serial.read();
+  
+  while (!Serial.available());
+  while (Serial.available() > 0) {
+    char ch = Serial.read();
+    if (ch != 13) {
+      input += ch;
+    }  
+  }
+  return input;
+}
+
+void setup() {
   m1.init();
   m2.init();
   m3.init();
   m4.init();
   
-  m1.set(MAX_SPEAD);
-  m2.set(MAX_SPEAD);
-  m3.set(MAX_SPEAD);
-  m4.set(MAX_SPEAD);
-  
-  // Wait for input
+  Serial.begin(9600);
   while (!Serial.available());
-  Serial.read();
-  Serial.println("Minimum 1");
+    
+  String input = dialog("Would you like to calibrate motors? (y/n)");
+  if (input == String("y")) {
+    isCalibrate = true;
+    
+    dialog("Setting min spead");
+    m1.set(MAX_SPEAD);
+    m2.set(MAX_SPEAD);
+    m3.set(MAX_SPEAD);
+    m4.set(MAX_SPEAD);
+    
+    dialog("Press any key to set max spead");
+    m1.set(MIN_SPEAD);
+    m2.set(MIN_SPEAD);
+    m3.set(MIN_SPEAD);
+    m4.set(MIN_SPEAD);
+    dialog("Calibration done. Press reset button on board");
+    
+  } else {
+    gyro.init();
+    gyro.calibrate();
+  }
+
+  return;
   
-  m1.set(MIN_SPEAD);
-  m2.set(MIN_SPEAD);
-  m3.set(MIN_SPEAD);
-  m4.set(MIN_SPEAD);
-  Serial.println("Minimum 2");
+
+ 
   
 }
-void loop() {}
 
-#else
-
-void setup() { 
-  Serial.begin(9600);
-  while (!Serial.available());
-
-  m1.init();
-  m2.init();
-  m3.init();
-  m4.init();
-  gyro.init();
-  gyro.calibrate();
-} 
- 
-void loop() { 
+void loop() {
+  if (isCalibrate) {
+    return;
+  } 
   
   gyro.update();
   
@@ -280,4 +295,3 @@ void loop() {
 
 }
 
-#endif
