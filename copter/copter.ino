@@ -1,4 +1,4 @@
-#define CALIBRATION false
+#define CALIBRATION true
 
 #include <Servo.h>
 #include "I2Cdev.h"
@@ -70,20 +70,32 @@ class Gyro {
     int gz;
     Angle x;
     Angle y;
-    MPU6050 acce;
+    MPU6050 mpu;
     
   public: 
     Gyro () {
       startTime = millis();
       enabled = true;
     }
-    void init() {
-      acce.initialize();
+    void init() {      
+      mpu.initialize();
+      mpu.setDLPFMode(MPU6050_DLPF_BW_5);
+    }
+    
+    void calibrate() {
+      //mpu.setXAccelOffset(-116);
+      //mpu.setYAccelOffset(-1288);
+      //mpu.setZAccelOffset(-1070);
+      mpu.setXGyroOffset(81);
+      mpu.setYGyroOffset(-22);
+      mpu.setZGyroOffset(-38);
+      mpu.setZAccelOffset(-1070);
+      //mpu.setDLPFMode(MPU6050_DLPF_BW_98);
     }
   
     void update() {
-      acce.getRotation(&gx, &gy, &gz);
-      //Serial.print("gx, gy:\t"); Serial.print(gx); Serial.println(gy);
+      mpu.getRotation(&gx, &gy, &gz);
+      Serial.print("gx, gy:\t"); Serial.print(gx); Serial.print("\t"); Serial.print(gy); Serial.print("\t");
       int endTime = millis();
       int dt = endTime - startTime;
       startTime = endTime;
@@ -199,6 +211,7 @@ void setup() {
   m3.init();
   m4.init();
   gyro.init();
+  gyro.calibrate();
 } 
  
 void loop() { 
@@ -225,6 +238,7 @@ void loop() {
     m2.balance(0);
   }
   
+  
   Serial.print(x);Serial.print("\t");
   Serial.print(y);Serial.print("\t");
   Serial.print(m1.get());Serial.print("\t"); 
@@ -232,7 +246,7 @@ void loop() {
   Serial.print(m3.get());Serial.print("\t");
   Serial.print(m4.get());Serial.print("\t");
   Serial.println();
-
+  
   if (Serial.available() > 0) {    
     char ch = Serial.read();
     
