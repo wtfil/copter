@@ -152,6 +152,7 @@ class Motor {
     }
     
     int get () {
+
       int diff = spead - MIN_SPEAD;
       return diff <= 0 ? spead : (MIN_SPEAD + diff * balanceSpead);
     }
@@ -201,13 +202,14 @@ void setup() {
   if (input == String("y")) {
     isCalibrate = true;
     
-    dialog("Setting min spead");
+    while(!Serial.available());
+    //dialog("Setting max spead");
     m1.set(MAX_SPEAD);
     m2.set(MAX_SPEAD);
     m3.set(MAX_SPEAD);
     m4.set(MAX_SPEAD);
     
-    dialog("Press any key to set max spead");
+    dialog("Press any key to set min spead");
     m1.set(MIN_SPEAD);
     m2.set(MIN_SPEAD);
     m3.set(MIN_SPEAD);
@@ -219,17 +221,12 @@ void setup() {
     gyro.calibrate();
   }
 
-  return;
-  
-
- 
-  
 }
 
 void loop() {
-  if (isCalibrate) {
+  /*if (isCalibrate) {
     return;
-  } 
+  } */
   
   gyro.update();
   
@@ -252,8 +249,7 @@ void loop() {
     m4.balance(-y);
     m2.balance(0);
   }
-  
-  
+    
   Serial.print(x);Serial.print("\t");
   Serial.print(y);Serial.print("\t");
   Serial.print(m1.get());Serial.print("\t"); 
@@ -278,7 +274,7 @@ void loop() {
       } else if (String("on") == input) {
         Serial.println("enable..");
         gyro.on();
-      } else if (val >= MIN_SPEAD && val <= MAX_SPEAD) {
+      } else if (val == 0 || val >= MIN_SPEAD && val <= MAX_SPEAD) {
         Serial.print("writing:\t"); Serial.println(val);
         m1.set(val);
         m2.set(val);
@@ -291,7 +287,5 @@ void loop() {
     }
     
   }
-  //delay(50);
 
 }
-
